@@ -1,138 +1,95 @@
 name: Build Android APK
 
-on: [push]
-
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
-
-build:
-
-runs-on: ubuntu-latest
-
-env:
-
-FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-steps:
-
-- name: Checkout Code
-
-uses: actions/checkout@v4
-
-
-- name: Set up JDK 21
-
-uses: actions/setup-java@v4
-
-with:
-
-java-version: '21'
-
-distribution: 'temurin'
-
-
-- name: Install Dependencies
-
-run: npm install --force
-
-
-- name: Build Web Project
-
-run: |
-
-
-
-npm run build -- --base=./ || npm run build || true
-
-if [ ! -d "dist" ]; then
-
-mkdir -p dist
-
-cp index.html dist/ 2>/dev/null || true
-
-fi
-
-
-- name: Setup Capacitor Config
-
-run: |
-
-npm install @capacitor/core @capacitor/cli @capacitor/android
-
-
-
-
-
-
-
-cat <<EOF > capacitor.config.json
-
-{
-
-"appId": "com.ec.aoo",
-
-"appName": "testapp",
-
-"webDir": "dist",
-
-"server": {
-
-"androidScheme": "https",
-
-"hostname": "localhost",
-
-"cleartext": true
-
-}
-
-}
-
-EOF
-
-
-
-npx cap add android || true
-
-npx cap sync android
-
-
-- name: Build Android APK
-
-run: |
-
-cd android
-
-
-
-
-
-echo "configurations.all {
-
-resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-
-if (details.requested.group == 'org.jetbrains.kotlin') {
-
-details.useVersion '1.8.22'
-
-}
-
-}
-
-}" >> app/build.gradle
-
-
-
-chmod +x gradlew
-
-./gradlew assembleDebug
-
-
-- name: Upload APK
-
-uses: actions/upload-artifact@v4
-
-with:
-
-name: Mobile-App-APK
-
-path: android/app/build/outputs/apk/debug/app-debug.apk
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm install --force
+
+      - name: Build Web Project
+        run: npm run build -- --base=./
+
+      - name: Check Web Build
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "ERROR: dist folder was not created."
+            exit 1
+          fi
+
+          if [ ! -f "dist/index.html" ]; then
+            echo "ERROR: dist/index.html was not found."
+            exit 1
+          fi
+
+      - name: Install Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Create Capacitor Config
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.ec.aoo",
+            "appName": "testapp",
+            "webDir": "dist",
+            "server": {
+              "androidScheme": "https",
+              "hostname": "localhost",
+              "cleartext": true
+            }
+          }
+          EOF
+
+      - name: Add Android Platform
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Android APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Check APK
+        run: |
+          if [ ! -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "ERROR: APK was not created."
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mobile-App-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
