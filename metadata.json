@@ -1,0 +1,6 @@
+{
+  "name": "Calculator",
+  "description": "A sleek, modern, and versatile calculator supporting standard and scientific operations, calculation history, and Bengali numerals toggle.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
